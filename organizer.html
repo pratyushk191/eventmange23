@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><title>Organizer Portal</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .notif-dropdown { position: absolute; top: 60px; right: 80px; width: 300px; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: none; z-index: 1000; color: #333; }
+    .notif-item { padding: 12px; border-bottom: 1px solid #f9f9f9; font-size: 12px; }
+    .notif-badge { background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; position: absolute; top: -5px; right: -5px; }
+    .equip-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <h1>CampusConnect <span class="role-badge" style="background:#8b5cf6">Organizer</span></h1>
+    <div class="nav-right">
+      <div style="position:relative; cursor:pointer;" onclick="toggleNotifs()">
+        <span style="font-size:20px;">🔔</span>
+        <span id="notif-count" class="notif-badge" style="display:none;">0</span>
+        <div id="notif-list" class="notif-dropdown"></div>
+      </div>
+      <div class="user-profile-trigger" onclick="toggleProfileModal()">
+        <div class="profile-img" id="nav-avatar">?</div>
+        <span id="nav-username">Loading...</span>
+      </div>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <div id="profile-modal" class="modal-overlay" onclick="if(event.target == this) toggleProfileModal()">
+      <div class="modal-content">
+        <span class="close-modal" onclick="toggleProfileModal()">&times;</span>
+        <h2>User Profile</h2>
+        <div class="profile-detail"><label>Full Name</label><span id="prof-name">---</span></div>
+        <div class="profile-detail"><label>Dept</label><span id="prof-dept">---</span></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <ul>
+        <li class="active" onclick="showSection('org-dash', this)">Dashboard</li>
+        <li onclick="showSection('org-create', this)">Create Event</li>
+        <li onclick="showSection('org-manage', this)">Student Requests</li>
+      </ul>
+    </aside>
+
+    <main class="main-content">
+      <div id="org-dash" class="content-section">
+        <h2>Club Overview</h2>
+        <div class="cards">
+          <div class="card"><h3>Total Events</h3><p id="event-count">0</p></div>
+        </div>
+      </div>
+
+      <div id="org-create" class="content-section hidden">
+        <h2>Request New Event & Resources</h2>
+        <div class="student-form">
+          <label>Event Name</label><input type="text" id="ev-name">
+          <label>Date</label><input type="date" id="ev-date">
+          <label>Venue/Room</label>
+          <select id="ev-room">
+            <option>Seminar Hall A</option><option>Main Auditorium</option><option>Open Air Theatre</option>
+          </select>
+          <label>Time Slot</label>
+          <select id="ev-slot">
+            <option>09:00 AM - 12:00 PM</option><option>02:00 PM - 05:00 PM</option>
+          </select>
+          
+          <label><strong>Select Equipment:</strong></label>
+          <div class="equip-grid">
+            <label><input type="checkbox" class="equip-opt" value="Camera"> Camera</label>
+            <label><input type="checkbox" class="equip-opt" value="Mic"> Microphone</label>
+            <label><input type="checkbox" class="equip-opt" value="Lightings"> Lightings</label>
+            <label><input type="checkbox" class="equip-opt" value="Projector"> Projector</label>
+            <label><input type="checkbox" class="equip-opt" value="Sound System"> Sound System</label>
+          </div>
+          
+          <button class="btn approve" style="margin-top:20px;" onclick="requestEvent()">Submit Proposal</button>
+        </div>
+      </div>
+
+      <div id="org-manage" class="content-section hidden">
+        <h2>Manage Applications</h2>
+        <div class="table-section">
+          <table>
+            <thead><tr><th>Event</th><th>Student</th><th>Action</th></tr></thead>
+            <tbody id="org-student-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const user = JSON.parse(sessionStorage.getItem('currentUser'));
+
+    function requestEvent() {
+      const name = document.getElementById('ev-name').value;
+      const date = document.getElementById('ev-date').value;
+      const room = document.getElementById('ev-room').value;
+      const slot = document.getElementById('ev-slot').value;
+      const equip = Array.from(document.querySelectorAll('.equip-opt:checked')).map(cb => cb.value);
+
+      if(!name || !date) return alert("Fill all fields");
+
+      let events = JSON.parse(localStorage.getItem('globalEvents')) || [];
+      events.push({ 
+        name, 
+        organizer: user.name, 
+        date, 
+        room, 
+        slot, 
+        equipment: equip, 
+        status: "Pending" 
+      });
+      
+      localStorage.setItem('globalEvents', JSON.stringify(events));
+      alert("Sent for Admin approval!");
+      location.reload(); 
+    }
+
+    function loadStudentRequests() {
+      const table = document.getElementById('org-student-table');
+      const reqs = JSON.parse(localStorage.getItem('studentRequests')) || [];
+      const myReqs = reqs.filter(r => r.organizer === user.name && r.status === 'Pending');
+      
+      table.innerHTML = myReqs.length ? "" : "<tr><td colspan='3'>No applicants.</td></tr>";
+      reqs.forEach((r, idx) => {
+        if(r.organizer === user.name && r.status === 'Pending') {
+          table.innerHTML += `<tr><td>${r.eventName}</td><td>${r.studentName}</td>
+            <td><button class="btn approve" onclick="respond('${r.studentName}', '${r.eventName}', 'Approved')">Approve</button></td></tr>`;
+        }
+      });
+      updateRequestCount();
+    }
+
+    function respond(sName, eName, status) {
+      let reqs = JSON.parse(localStorage.getItem('studentRequests'));
+      const idx = reqs.findIndex(r => r.studentName === sName && r.eventName === eName);
+      reqs[idx].status = status;
+      localStorage.setItem('studentRequests', JSON.stringify(reqs));
+      loadStudentRequests();
+    }
+
+    function showSection(id, el) {
+      document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+      el.classList.add('active');
+      if(id === 'org-manage') loadStudentRequests();
+    }
+
+    function toggleProfileModal() {
+      const m = document.getElementById('profile-modal');
+      m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+      document.getElementById('prof-name').innerText = user.name;
+      document.getElementById('prof-dept').innerText = user.dept;
+    }
+
+    function logout() { sessionStorage.removeItem('currentUser'); window.location.href='login.html'; }
+
+    window.onload = () => {
+      document.getElementById('nav-username').innerText = user.name;
+      const events = JSON.parse(localStorage.getItem('globalEvents')) || [];
+      document.getElementById('event-count').innerText = events.filter(e => e.organizer === user.name).length;
+    };
+  </script>
+</body>
+</html>

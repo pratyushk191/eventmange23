@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><title>Admin Portal</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .notif-badge { background: #ef4444; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; position: absolute; top: -5px; right: -5px; }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <h1>CampusConnect <span class="role-badge">Admin Portal</span></h1>
+    <div class="nav-right">
+      <div style="position:relative;">
+        <span style="font-size:20px;">🔔</span>
+        <span id="notif-count" class="notif-badge" style="display:none;">0</span>
+      </div>
+      <div class="user-profile-trigger" onclick="toggleProfileModal()">
+        <div class="profile-img">A</div>
+        <span id="nav-username">Admin</span>
+      </div>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <ul>
+        <li class="active" onclick="showSection('admin-dash', this)">Analytics</li>
+        <li onclick="showSection('admin-approvals', this)">Event Requests</li>
+        <li onclick="showSection('admin-resources', this)">Resource Monitor</li>
+        <li onclick="showSection('admin-messages', this)">Broadcast</li>
+      </ul>
+    </aside>
+
+    <main class="main-content">
+      <div id="admin-dash" class="content-section">
+        <h2>Event Participation Analytics</h2>
+        <div class="cards" id="analytics-cards"></div>
+      </div>
+
+      <div id="admin-approvals" class="content-section hidden">
+        <h2>Pending Event Requests (<span id="pending-count">0</span>)</h2>
+        <div class="table-section">
+          <table>
+            <thead><tr><th>Event</th><th>Organizer</th><th>Date</th><th>Action</th></tr></thead>
+            <tbody id="admin-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="admin-resources" class="content-section hidden">
+        <h2>Upcoming/Current Resource & Room Usage</h2>
+        <div class="table-section">
+          <table>
+            <thead><tr><th>Room</th><th>Event</th><th>Slot</th><th>Equipment Used</th></tr></thead>
+            <tbody id="resource-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="admin-messages" class="content-section hidden">
+        <h2>Broadcast Announcement</h2>
+        <div class="student-form">
+          <input type="text" id="msg-subject" placeholder="Subject">
+          <textarea id="msg-body" placeholder="Message content..." rows="4"></textarea>
+          <button class="btn approve" onclick="sendMessage()">Send to All Students</button>
+          <button class="btn reject" onclick="clearLoungeChat()" style="margin-top:20px;">Clear Lounge Chat</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="profile-modal" class="modal-overlay" onclick="if(event.target == this) toggleProfileModal()">
+    <div class="modal-content">
+      <span class="close-modal" onclick="toggleProfileModal()">&times;</span>
+      <h2>User Profile</h2>
+      <div class="profile-detail"><label>Full Name</label><span id="prof-name">Admin User</span></div>
+      <div class="profile-detail"><label>Role</label><span id="prof-role">Administrator</span></div>
+    </div>
+  </div>
+
+  <script>
+    function showSection(id, el) {
+      document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+      el.classList.add('active');
+      if(id === 'admin-dash') loadAnalytics();
+      if(id === 'admin-resources') loadResourceMonitor();
+    }
+
+    function loadPendingEvents() {
+      const table = document.getElementById('admin-table-body');
+      const events = JSON.parse(localStorage.getItem('globalEvents')) || [];
+      const pending = events.filter(e => e.status === 'Pending');
+      document.getElementById('pending-count').innerText = pending.length;
+      table.innerHTML = pending.length ? "" : "<tr><td colspan='4'>No pending events.</td></tr>";
+      events.forEach((ev, idx) => {
+        if(ev.status === 'Pending') {
+          table.innerHTML += `<tr><td>${ev.name}</td><td>${ev.organizer}</td><td>${ev.date}</td>
+            <td><button class="btn approve" onclick="updateEventStatus(${idx}, 'Approved')">Approve</button></td></tr>`;
+        }
+      });
+    }
+
+    function updateEventStatus(idx, status) {
+      let events = JSON.parse(localStorage.getItem('globalEvents'));
+      events[idx].status = status;
+      localStorage.setItem('globalEvents', JSON.stringify(events));
+      loadPendingEvents();
+      alert("Event " + status);
+    }
+
+    // Updated Resource Monitor logic
+    function loadResourceMonitor() {
+      const table = document.getElementById('resource-table-body');
+      const events = JSON.parse(localStorage.getItem('globalEvents')) || [];
+      const active = events.filter(e => e.status === 'Approved');
+      
+      table.innerHTML = active.map(ev => `
+        <tr>
+          <td>${ev.room}</td>
+          <td>${ev.name}</td>
+          <td>${ev.slot}</td>
+          <td>${(ev.equipment && ev.equipment.length) ? ev.equipment.join(', ') : 'No equipment'}</td>
+        </tr>`).join('') || "<tr><td colspan='4'>No resources currently in use.</td></tr>";
+    }
+
+    function loadAnalytics() {
+      const events = JSON.parse(localStorage.getItem('globalEvents')) || [];
+      const reqs = JSON.parse(localStorage.getItem('studentRequests')) || [];
+      const container = document.getElementById('analytics-cards');
+      const approvedEvents = events.filter(e => e.status === 'Approved');
+      container.innerHTML = approvedEvents.map(ev => {
+        const count = reqs.filter(r => r.eventName === ev.name && r.status === 'Approved').length;
+        return `<div class="card"><h3>${ev.name}</h3><p style="font-size: 24px; color: #3b82f6;">${count}</p><small>Students Participated</small></div>`;
+      }).join('') || "No approved events.";
+    }
+
+    function sendMessage() {
+      const subject = document.getElementById('msg-subject').value;
+      const content = document.getElementById('msg-body').value;
+      if(!subject || !content) return alert("Fill all fields");
+      let msgs = JSON.parse(localStorage.getItem('campusMessages')) || [];
+      msgs.unshift({ subject, content, time: new Date().toLocaleString() });
+      localStorage.setItem('campusMessages', JSON.stringify(msgs));
+      alert("Broadcasted!");
+      document.getElementById('msg-subject').value = ""; document.getElementById('msg-body').value = "";
+    }
+
+    function clearLoungeChat() {
+      if(confirm("Clear all student messages?")) { localStorage.removeItem('groupChat'); alert("Cleared."); }
+    }
+
+    function toggleProfileModal() {
+      const m = document.getElementById('profile-modal');
+      m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    function logout() { sessionStorage.removeItem('currentUser'); window.location.href='login.html'; }
+    window.onload = () => { loadPendingEvents(); loadAnalytics(); };
+  </script>
+</body>
+</html>

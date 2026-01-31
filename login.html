@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login & Register - CampusConnect</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .auth-container { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .auth-toggle { display: flex; justify-content: space-around; margin-bottom: 20px; cursor: pointer; }
+    .auth-toggle span { padding: 10px; color: #666; }
+    .auth-toggle .active { color: #1f2937; border-bottom: 2px solid #1f2937; font-weight: bold; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-size: 14px; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-toggle">
+      <span id="login-tab" class="active" onclick="toggleAuth('login')">Login</span>
+      <span id="reg-tab" onclick="toggleAuth('register')">Register</span>
+    </div>
+
+    <form id="login-form">
+      <div class="form-group"><label>Email</label><input type="email" id="login-email" required></div>
+      <div class="form-group"><label>Password</label><input type="password" id="login-pass" required></div>
+      <button type="submit" class="btn approve" style="width:100%">Login</button>
+    </form>
+
+    <form id="reg-form" class="hidden">
+      <div class="form-group"><label>Full Name</label><input type="text" id="reg-name" required></div>
+      <div class="form-group"><label>Department</label><input type="text" id="reg-dept" required></div>
+      <div class="form-group"><label>Year</label><input type="number" id="reg-year" placeholder="e.g. 2" required></div>
+      <div class="form-group">
+        <label>Role</label>
+        <select id="reg-role">
+          <option value="student">Student</option>
+          <option value="organizer">Organizer (Club/Committee)</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Email</label><input type="email" id="reg-email" required></div>
+      <div class="form-group"><label>Password</label><input type="password" id="reg-pass" required></div>
+      <button type="submit" class="btn approve" style="width:100%">Register</button>
+    </form>
+  </div>
+
+  <script>
+    function toggleAuth(type) {
+      if(type === 'login') {
+        document.getElementById('login-form').classList.remove('hidden');
+        document.getElementById('reg-form').classList.add('hidden');
+        document.getElementById('login-tab').classList.add('active');
+        document.getElementById('reg-tab').classList.remove('active');
+      } else {
+        document.getElementById('login-form').classList.add('hidden');
+        document.getElementById('reg-form').classList.remove('hidden');
+        document.getElementById('reg-tab').classList.add('active');
+        document.getElementById('login-tab').classList.remove('active');
+      }
+    }
+
+    // Handle Registration
+    document.getElementById('reg-form').onsubmit = function(e) {
+      e.preventDefault();
+      const user = {
+        name: document.getElementById('reg-name').value,
+        dept: document.getElementById('reg-dept').value,
+        year: document.getElementById('reg-year').value,
+        role: document.getElementById('reg-role').value,
+        email: document.getElementById('reg-email').value,
+        pass: document.getElementById('reg-pass').value
+      };
+      localStorage.setItem(user.email, JSON.stringify(user));
+      alert("Registration Successful! Please login.");
+      toggleAuth('login');
+    };
+
+    // Handle Login
+    document.getElementById('login-form').onsubmit = function(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-pass').value;
+      const userData = JSON.parse(localStorage.getItem(email));
+
+      if(userData && userData.pass === pass) {
+        sessionStorage.setItem('currentUser', JSON.stringify(userData));
+        // Redirect based on role
+        if(userData.role === 'admin') window.location.href = 'admin.html';
+        else if(userData.role === 'organizer') window.location.href = 'organizer.html';
+        else window.location.href = 'student.html';
+      } else {
+        alert("Invalid Credentials");
+      }
+    };
+  </script>
+</body>
+</html>
